@@ -1,0 +1,16 @@
+node_modules/
+dist/
+work/
+backups/
+runtime/
+*.log
+*.token
+*.veg
+*.veg.bak
+*.dll
+*.exe
+.env
+.env.*
+!.env.example
+UnitedTaps.VegasMcp.instances/
+UnitedTaps.VegasMcp.runtime/
