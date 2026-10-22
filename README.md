@@ -1,10 +1,13 @@
-# VEGAS Pro MCP
+# VEGAS Pro MCP — VEGAS 2027 Build 31 fork
 
-Control VEGAS Pro 2026 from an MCP-compatible AI assistant on Windows. Inspect a
+[Инструкция на русском](README.ru.md) · [2027 audit and validation](docs/VEGAS2027-AUDIT.md)
+
+Control **Boris FX VEGAS Pro 2027.0.0 Build 31** from OpenAI Codex or another MCP-compatible AI assistant on Windows. Inspect a
 project, edit the timeline, work with audio and effects, and render through nine
 tools with 100 actions.
 
-**Public beta: 2.1.0-beta.1.** Developed by United Taps. This is an independent
+**Fork: 2.1.1-vegas2027.31**, maintained in [RockZe/vegas-pro-mcp](https://github.com/RockZe/vegas-pro-mcp).
+Based on United Taps' **2.1.0-beta.1** ([original](https://github.com/unitedtaps2/vegas-pro-mcp), MIT). This is an independent
 community project; it is not an official VEGAS, Boris FX, or MAGIX product.
 
 The server runs locally over MCP stdio. A C# application extension runs inside
@@ -16,8 +19,9 @@ to its model provider under that client's settings.
 ## Requirements
 
 - Windows 10 or 11, 64-bit.
-- A licensed installation of VEGAS Pro 2026. The local integration was checked
-  with Build 143; other versions are unverified.
+- A licensed installation of **VEGAS Pro 2027.0.0 Build 31**. Both `vegas2027.exe`
+  and `ScriptPortal.Vegas.dll` must have file version `2027.0.0.31`.
+  Other versions are deliberately refused, including when `vegas_pid` is explicit.
 - Node.js 22 or newer (22 and 24 are the CI targets).
 - Windows PowerShell 5.1 and .NET Framework 4.8, including its C# compiler.
 - An MCP client that supports local stdio servers.
@@ -33,7 +37,7 @@ API; no separate Visual Studio installation is needed.
 Run these commands in PowerShell:
 
 ```powershell
-git clone https://github.com/unitedtaps2/vegas-pro-mcp.git
+git clone https://github.com/RockZe/vegas-pro-mcp.git
 cd vegas-pro-mcp
 npm ci --ignore-scripts
 npm run check
@@ -47,7 +51,9 @@ The installer refuses to replace the extension while VEGAS is running.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-extension.ps1
 ```
 
-The installer builds `dist\UnitedTaps.VegasMcp.dll`, creates a local random token,
+The installer discovers the exact host via standard directories or the uninstall
+registry and verifies executable/API file versions. It builds the x64 extension
+`dist\UnitedTaps.VegasMcp.dll`, creates a local random token,
 restricts its permissions, and installs under the Windows Documents Known Folder:
 `Vegas Application Extensions`. This supports redirected Documents folders.
 An existing DLL is copied to a unique directory under `backups` before replacement.
@@ -56,7 +62,7 @@ Existing tokens are preserved and are never uploaded.
 For a nonstandard VEGAS installation, pass its directory:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-extension.ps1 -VegasInstallPath 'D:\Apps\Vegas Pro 2026'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-extension.ps1 -VegasInstallPath 'D:\Apps\Vegas Pro 2027'
 ```
 
 Then start VEGAS. Under Tools > Extensions, the **United Taps VEGAS MCP Status**
@@ -64,6 +70,24 @@ command should report that the connector is running. The extension's internal
 DLL, pipe and menu names retain the United Taps prefix for compatibility.
 
 ## Connect your AI client
+
+For **Codex**, with Codex CLI available on PATH:
+
+```powershell
+npm run setup:codex
+npm run vegas
+npm run probe
+```
+
+This registers `vegas-pro-2027` over STDIO with absolute Node/server paths and
+the resolved extension root, then sets a 30-second startup and 210-second tool
+timeout. Reconnect MCP or restart Codex. Existing server names are not overwritten.
+The installer preserves a local Codex configuration backup when changing timeouts.
+`scripts/setup-codex.ps1 -PrintOnly` prints a manual TOML entry instead.
+See [official Codex MCP configuration](https://developers.openai.com/codex/mcp/).
+
+`npm run vegas` launches only the verified Build 31 executable. MCP startup itself
+does not open the editor, replace the active project, or terminate another version.
 
 Register a local stdio server using `node` and the **absolute path** to
 `src/server.mjs`. In clients that use an `mcpServers` JSON object, the entry looks
@@ -99,7 +123,7 @@ installed token. Never put a token value in client configuration or an issue.
 4. Review a small edit in VEGAS, including picture, sound, and Undo, before
    using it on important work.
 
-If more than one VEGAS process is connected, pass `vegas_pid` inside the action's
+If more than one matching Build 31 process is connected, pass `vegas_pid` inside the action's
 `params` (or directly to `vegas_status`). Obtain it from status discovery.
 A useful first request is: "Inspect my VEGAS project and summarize its tracks.
 Do not change anything."
@@ -142,12 +166,16 @@ See [usage examples](docs/USAGE.md) and the
 ## Development and checks
 
 ```powershell
-npm run check          # syntax checks and 30 focused tests
+npm run check          # syntax checks and focused Node tests
 npm run smoke          # real MCP stdio handshake, catalog, rejected unsafe calls
 npm run test:native    # 12 range-edit algorithm scenarios; Windows only
 npm run test:installer # isolated install/update/rollback fixture; Windows only
 powershell.exe -NoProfile -File .\scripts\build-extension.ps1
 npm audit --omit=dev
+npm run doctor         # installed DLL/API/token/manifest diagnostics
+npm run probe          # read-only real MCP STDIO -> VEGAS probe
+npm run test:live:prepare # requires every VEGAS closed; creates a disposable project
+npm run test:live       # edits only that verified disposable project, writes report
 ```
 
 CI runs the Node tests and protocol smoke on Windows and Linux, Node 22 and 24.
@@ -160,9 +188,13 @@ folders, and secrets must stay untracked. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Troubleshooting
 
-- **No live instance:** verify installation, fully restart VEGAS after installing,
+- **No live instance:** verify that the running editor is exactly Build 31, verify installation, fully restart VEGAS after installing,
   and check Tools > Extensions. Inspect the log under the installation directory's
   `UnitedTaps.VegasMcp.runtime` folder. Logs can contain private paths.
+- **Idle pipe client:** disconnected after 15 seconds. Connection-only retries
+  bridge the brief listener reopen gap; sent operations are never replayed.
+- **Node logs:** diagnostics go to stderr. `VEGAS_MCP_LOG_LEVEL=info` enables
+  successful action timings. Parameters and connector tokens are not logged.
 - **Wrong installation folder:** set `VEGAS_MCP_INSTALL_ROOT` to the installer result.
 - **Active project changed:** inspect again and use the returned exact path and
   event identities. Do not reuse IDs across project reloads or Undo/Redo.

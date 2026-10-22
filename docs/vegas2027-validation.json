@@ -1,0 +1,224 @@
+{
+  "version": "2.1.1-vegas2027.31",
+  "validation_date": "2026-10-22",
+  "host_file_version": "2027.0.0.31",
+  "api_file_version": "2027.0.0.31",
+  "reported_host": "Version 2027.0.0 build 31",
+  "connector_version": "2.1.1.0",
+  "node_version": "v24.19.0",
+  "transport": "MCP STDIO -> authenticated same-user Windows named pipe -> native extension",
+  "native_scenarios_passed": 21,
+  "domain_tool_calls": 137,
+  "successful_direct_domain_actions": [
+    "audio.add_bus",
+    "audio.delete_envelope_point",
+    "audio.inspect_envelopes",
+    "audio.list_buses",
+    "audio.normalize",
+    "audio.route_track",
+    "audio.set_bus_mix",
+    "audio.set_envelope_point",
+    "audio.set_event_gain_db",
+    "audio.set_track_mix",
+    "effects.add_event_effect",
+    "effects.add_track_effect",
+    "effects.list_event_effects",
+    "effects.list_plugins",
+    "effects.list_presets",
+    "effects.list_track_effects",
+    "effects.set_effect_state",
+    "effects.set_ofx_parameter",
+    "media.add_take",
+    "media.create_bin",
+    "media.insert_image_sequence",
+    "media.inspect",
+    "media.list",
+    "media.list_takes",
+    "media.remove_take",
+    "media.replace_event_media",
+    "media.set_active_take",
+    "motion.inspect_event_motion",
+    "motion.inspect_track_motion",
+    "motion.set_event_motion_keyframe",
+    "motion.set_track_motion_keyframe",
+    "project.backup",
+    "project.inspect",
+    "project.inspect_settings",
+    "project.redo",
+    "project.save",
+    "project.set_cursor",
+    "project.set_selection",
+    "project.set_settings",
+    "project.snapshot",
+    "project.undo",
+    "render.list",
+    "render.start",
+    "render.status",
+    "timeline.add_marker",
+    "timeline.add_region",
+    "timeline.add_track",
+    "timeline.batch",
+    "timeline.copy_event",
+    "timeline.copy_group",
+    "timeline.delete_event",
+    "timeline.delete_group",
+    "timeline.insert_linked_media",
+    "timeline.insert_media",
+    "timeline.inspect",
+    "timeline.move_event",
+    "timeline.move_group",
+    "timeline.split_event",
+    "timeline.split_group",
+    "timeline.trim_event"
+  ],
+  "additional_batch_actions": [
+    "timeline.set_fades"
+  ],
+  "actions_without_native_successful_execution": [
+    "project.play",
+    "project.pause",
+    "project.stop",
+    "project.insert_time",
+    "timeline.find_events",
+    "timeline.clear_selection",
+    "timeline.select_events",
+    "timeline.set_track",
+    "timeline.duplicate_track",
+    "timeline.set_event",
+    "timeline.set_transition",
+    "timeline.create_crossfade",
+    "timeline.create_linked_crossfade",
+    "timeline.close_gaps",
+    "timeline.ripple_delete",
+    "timeline.insert_title",
+    "timeline.group_events",
+    "timeline.ungroup_events",
+    "timeline.edit_marker",
+    "timeline.delete_marker",
+    "timeline.edit_region",
+    "timeline.delete_region",
+    "audio.recalculate_normalize",
+    "audio.set_channels",
+    "audio.set_audio_properties",
+    "audio.add_volume_envelope_point",
+    "audio.analyze_loudness",
+    "audio.set_loudness",
+    "audio.clear_envelope",
+    "effects.remove_event_effect",
+    "effects.remove_track_effect",
+    "effects.list_bus_effects",
+    "effects.add_bus_effect",
+    "effects.remove_bus_effect",
+    "effects.set_target_ofx_parameter",
+    "effects.copy_effect_chain",
+    "motion.clear_event_motion_keyframes",
+    "motion.clear_track_motion_keyframes",
+    "render.cancel"
+  ],
+  "native_checks": [
+    {
+      "name": "exact host, saved fixture and nine MCP tools",
+      "passed": true
+    },
+    {
+      "name": "wrong-project refusal before editing",
+      "passed": true
+    },
+    {
+      "name": "native authentication and expired queued request refusal",
+      "passed": true
+    },
+    {
+      "name": "backup, named Undo, native Undo and Redo",
+      "passed": true
+    },
+    {
+      "name": "project settings token and stale-settings refusal",
+      "passed": true
+    },
+    {
+      "name": "insert picture and PCM audio without changing source",
+      "passed": true
+    },
+    {
+      "name": "stale event identity and cancelled mutation leave timeline unchanged",
+      "passed": true
+    },
+    {
+      "name": "move, trim, split, copy, delete and readback",
+      "passed": true
+    },
+    {
+      "name": "fades and batch dry-run/apply/undo",
+      "passed": true
+    },
+    {
+      "name": "event gain, native peak normalize and track mix",
+      "passed": true
+    },
+    {
+      "name": "audio envelopes and bus routing",
+      "passed": true
+    },
+    {
+      "name": "media bins, takes and non-destructive replacement",
+      "passed": true
+    },
+    {
+      "name": "Pan/Crop and track-motion animation keyframes",
+      "passed": true
+    },
+    {
+      "name": "native OFX discovery, parameter edit and animation",
+      "passed": true
+    },
+    {
+      "name": "markers, regions and transport cursor",
+      "passed": true
+    },
+    {
+      "name": "snapshot output and overwrite refusal",
+      "passed": true
+    },
+    {
+      "name": "renderer discovery and real asynchronous PCM WAV render",
+      "passed": true
+    },
+    {
+      "name": "real uncompressed AVI video/audio render and linked A/V group edits",
+      "passed": true
+    },
+    {
+      "name": "image-sequence insertion and source PCM output integrity",
+      "passed": true
+    },
+    {
+      "name": "save, explicit backup and source-media hashes",
+      "passed": true
+    },
+    {
+      "name": "idle pipe client expires and listener accepts the next request",
+      "passed": true
+    }
+  ],
+  "ofx_plugin": {
+    "name": "Brightness and Contrast",
+    "unique_id": "{Svfx:com.vegascreativesoftware:brightnessandcontrast}"
+  },
+  "renders": [
+    {
+      "renderer": "Wave",
+      "template": "Default Template",
+      "status": "Complete",
+      "bytes": 384084
+    },
+    {
+      "renderer": "Video for Windows",
+      "template": "Default Template (uncompressed)",
+      "status": "Complete",
+      "bytes": 23390720
+    }
+  ],
+  "backup_reopened_and_timeline_matched": true,
+  "excluded_from_this_summary": "Private absolute paths, tokens, full project metadata, request parameters and runtime logs"
+}

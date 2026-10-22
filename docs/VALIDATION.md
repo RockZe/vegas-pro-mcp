@@ -1,4 +1,8 @@
-# Public beta validation
+# Original upstream public beta validation (historical)
+
+For the current fork's native Build 31 results see [VEGAS2027-AUDIT.md](VEGAS2027-AUDIT.md).
+The record below belongs to United Taps' original release and is not a claim
+about testing performed by this fork.
 
 Version: 2.1.0-beta.1
 Date: 2026-10-16

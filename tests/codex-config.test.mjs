@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+test("Codex timeout setup preserves other tables, backs up once and is idempotent", { skip: process.platform !== "win32" }, () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "vegas-codex-config-"));
+  const file = path.join(directory, "config.toml");
+  const original = "# existing settings\r\nmodel = 'test'\r\n[mcp_servers.vegas-pro-2027]\r\ncommand = 'node'\r\nargs = ['F:\\folder with spaces\\server.mjs']\r\n[mcp_servers.vegas-pro-2027.env]\r\nVEGAS_MCP_INSTALL_ROOT = 'C:\\Example'\r\n[mcp_servers.other]\r\ncommand = 'other'\r\n";
+  fs.writeFileSync(file, original);
+  const update = () => execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "scripts/set-codex-timeouts.ps1"), "-ConfigPath", file], { windowsHide: true });
+  update();
+  const actual = fs.readFileSync(file, "utf8");
+  assert.ok(actual.startsWith("# existing settings\r\nmodel = 'test'"));
+  assert.ok(actual.endsWith("[mcp_servers.other]\r\ncommand = 'other'\r\n"));
+  assert.match(actual, /startup_timeout_sec = 30\r?\n/);
+  assert.match(actual, /tool_timeout_sec = 210\r?\n/);
+  assert.ok(actual.indexOf("tool_timeout_sec") < actual.indexOf("[mcp_servers.vegas-pro-2027.env]"));
+  const backups = fs.readdirSync(directory).filter(x => x.endsWith(".bak"));
+  assert.equal(backups.length, 1); assert.equal(fs.readFileSync(path.join(directory, backups[0]), "utf8"), original);
+  update(); assert.equal(fs.readFileSync(file, "utf8"), actual);
+  assert.equal(fs.readdirSync(directory).filter(x => x.endsWith(".bak")).length, 1);
+});

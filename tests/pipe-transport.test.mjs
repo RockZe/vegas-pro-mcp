@@ -55,3 +55,21 @@ test("pipe transport surfaces native rejection and early disconnect", async () =
 test("pipe transport rejects a peer that never answers", async () => {
   await fixture(() => {}, async (call) => assert.rejects(call(), /did not answer/));
 });
+
+test("pipe connection retries a reopening listener before sending exactly once", async () => {
+  const pipePath = process.platform === "win32" ? `\\\\.\\pipe\\vegas-mcp-late-${crypto.randomUUID()}`
+    : path.join(fs.mkdtempSync(path.join(os.tmpdir(), "vegas-late-")), "pipe.sock");
+  let received = 0;
+  const server = net.createServer(socket => {
+    socket.on("data", data => {
+      received++;
+      const request = JSON.parse(data.toString());
+      socket.end(JSON.stringify({ request_id: request.request_id, ok: true, data: { once: true } }) + "\n");
+    });
+  });
+  const call = callVegasPipe({ instance: {}, pipePath, action: "timeline.add_track", params: {}, token: "test", timeoutMs: 2000 });
+  await new Promise(resolve => setTimeout(resolve, 150));
+  await new Promise(resolve => server.listen(pipePath, resolve));
+  try { assert.deepEqual(await call, { once: true }); assert.equal(received, 1); }
+  finally { await new Promise(resolve => server.close(resolve)); }
+});

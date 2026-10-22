@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolveInstallRoot } from "./install-path.mjs";
+import { assertTargetHost, isTargetHost } from "./target-host.mjs";
 
 export const INSTALL_ROOT = resolveInstallRoot();
 
@@ -27,7 +28,7 @@ export function isVegasProcess(pid) {
     );
     const record = output.split(/\r?\n/).map((line) => line.trim()).find((line) => line.startsWith('"'));
     const match = record && /^"([^"]+)","(\d+)"/.exec(record);
-    return Boolean(match && Number(match[2]) === pid && /^vegas.*\.exe$/i.test(match[1]));
+    return Boolean(match && Number(match[2]) === pid && /^vegas2027\.exe$/i.test(match[1]));
   } catch {
     return false;
   }
@@ -49,7 +50,7 @@ export function listInstances({
       const pid = Number(value.pid);
       const expectedName = `${pid}.json`;
       const expectedPipe = `UnitedTaps.VegasMcp.${pid}`;
-      if (name === expectedName && value.pipe_name === expectedPipe && alive(pid) && processMatches(pid)) {
+      if (name === expectedName && value.pipe_name === expectedPipe && isTargetHost(value) && alive(pid) && processMatches(pid)) {
         instances.push({ ...value, pid });
       }
     } catch {
@@ -66,11 +67,12 @@ export function chooseInstance(instances, requestedPid) {
     if (!match) {
       throw new Error(`No live VEGAS MCP instance matches vegas_pid=${requestedPid}.`);
     }
+    assertTargetHost(match);
     return match;
   }
   if (instances.length === 0) {
     throw new Error(
-      "No live VEGAS MCP extension was found. Start or restart VEGAS Pro 2026 after installing the connector.",
+      "No live VEGAS MCP extension was found. Start or restart VEGAS Pro 2027.0.0 Build 31 after installing the connector.",
     );
   }
   if (instances.length > 1) {
@@ -78,6 +80,7 @@ export function chooseInstance(instances, requestedPid) {
       `Multiple VEGAS instances are running (${instances.map((x) => x.pid).join(", ")}). Pass vegas_pid explicitly.`,
     );
   }
+  assertTargetHost(instances[0]);
   return instances[0];
 }
 
@@ -114,7 +117,9 @@ export async function callVegasPipe({ instance, action, params, token, timeoutMs
   };
 
   return await new Promise((resolve, reject) => {
-    const socket = net.createConnection(pipePath);
+    let socket;
+    let connectRetry;
+    const connectDeadline = Date.now() + Math.min(timeoutMs, 1500);
     let buffer = "";
     let settled = false;
 
@@ -122,7 +127,8 @@ export async function callVegasPipe({ instance, action, params, token, timeoutMs
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      socket.destroy();
+      clearTimeout(connectRetry);
+      socket?.destroy();
       fn(value);
     };
 
@@ -130,32 +136,47 @@ export async function callVegasPipe({ instance, action, params, token, timeoutMs
       finish(reject, new Error(`VEGAS did not answer ${action} within ${timeoutMs} ms.`));
     }, timeoutMs);
 
-    socket.setEncoding("utf8");
-    socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
-    socket.on("data", (chunk) => {
-      buffer += chunk;
-      if (Buffer.byteLength(buffer, "utf8") > 8 * 1024 * 1024) {
-        finish(reject, new Error("VEGAS response exceeded the 8 MB connector limit."));
-        return;
-      }
-      const newline = buffer.indexOf("\n");
-      if (newline < 0) return;
-      try {
-        const response = JSON.parse(buffer.slice(0, newline));
-        if (response.request_id !== request.request_id) {
-          throw new Error("VEGAS returned a mismatched request identifier.");
+    function connect() {
+      if (settled) return;
+      socket = net.createConnection(pipePath);
+      const current = socket;
+      let connected = false;
+      socket.setEncoding("utf8");
+      socket.on("connect", () => { connected = true; socket.write(`${JSON.stringify(request)}\n`); });
+      socket.on("data", (chunk) => {
+        buffer += chunk;
+        if (Buffer.byteLength(buffer, "utf8") > 8 * 1024 * 1024) {
+          finish(reject, new Error("VEGAS response exceeded the 8 MB connector limit."));
+          return;
         }
-        if (!response.ok) {
-          throw new Error(response?.error?.message || "VEGAS rejected the command.");
+        const newline = buffer.indexOf("\n");
+        if (newline < 0) return;
+        try {
+          const response = JSON.parse(buffer.slice(0, newline));
+          if (response.request_id !== request.request_id) {
+            throw new Error("VEGAS returned a mismatched request identifier.");
+          }
+          if (!response.ok) {
+            throw new Error(response?.error?.message || "VEGAS rejected the command.");
+          }
+          finish(resolve, response.data);
+        } catch (error) {
+          finish(reject, error);
         }
-        finish(resolve, response.data);
-      } catch (error) {
-        finish(reject, error);
-      }
-    });
-    socket.on("error", (error) => finish(reject, error));
-    socket.on("end", () => {
-      if (!settled) finish(reject, new Error("VEGAS closed the connector pipe without a response."));
-    });
+      });
+      socket.on("error", (error) => {
+        // A single-instance native pipe has a brief gap while its listener reopens.
+        // Retry only a connection that NEVER connected or sent bytes. Never replay
+        // an edit after a timeout, disconnection or an uncertain execution result.
+        if (!connected && ["ENOENT", "ECONNREFUSED", "EBUSY"].includes(error.code) && Date.now() < connectDeadline) {
+          current.destroy();
+          connectRetry = setTimeout(connect, 50);
+        } else finish(reject, error);
+      });
+      socket.on("end", () => {
+        if (!settled) finish(reject, new Error("VEGAS closed the connector pipe without a response."));
+      });
+    }
+    connect();
   });
 }

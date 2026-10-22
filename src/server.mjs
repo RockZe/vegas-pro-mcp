@@ -6,13 +6,15 @@ import fs from "node:fs";
 import { callVegas, listInstances } from "./pipe-client.mjs";
 import { ACTIONS, domainActionCount } from "./action-catalog.mjs";
 import { validateRequest } from "./request-validation.mjs";
+import { TARGET_FILE_VERSION } from "./target-host.mjs";
+import { diagnostic } from "./diagnostics.mjs";
 
 const server = new McpServer({
-  name: "united-taps-vegas-pro",
+  name: "vegas-pro-2027-build31",
   version: JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
 });
 
-const ParamsSchema = z.record(z.unknown()).optional().default({});
+const ParamsSchema = z.record(z.string(), z.unknown()).optional().default({});
 
 function textResult(value) {
   return {
@@ -22,10 +24,14 @@ function textResult(value) {
 }
 
 async function run(action, params) {
+  const started = Date.now();
   try {
     validateRequest(action, params);
-    return textResult(await callVegas(action, params));
+    const data = await callVegas(action, params);
+    diagnostic("info", action, { elapsed_ms: Date.now() - started });
+    return textResult(data);
   } catch (error) {
+    diagnostic("error", action, { error_type: error?.name ?? "Error", elapsed_ms: Date.now() - started });
     return {
       isError: true,
       content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
@@ -52,6 +58,7 @@ server.registerTool(
         render_and_snapshot_outputs_refuse_overwrite: true,
       },
       domain_action_count: domainActionCount(),
+      required_host_file_version: TARGET_FILE_VERSION,
       tools: {
         vegas_status: ["list live instances", "inspect active project and transport"],
         vegas_project: ACTIONS.project,
@@ -68,7 +75,7 @@ server.registerTool(
 server.registerTool(
   "vegas_status",
   {
-    description: "List live VEGAS Pro 2026 connector instances or inspect one instance. Pass vegas_pid only when multiple copies of VEGAS are open.",
+    description: "Discover and inspect VEGAS Pro 2027.0.0 Build 31 only. Other VEGAS versions are refused. Pass vegas_pid when multiple matching instances are open.",
     inputSchema: { vegas_pid: z.number().int().positive().optional() },
   },
   async ({ vegas_pid }) => {

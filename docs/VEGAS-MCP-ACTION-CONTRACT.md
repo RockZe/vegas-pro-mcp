@@ -2,16 +2,20 @@
 
 Status: ACTIVE
 
-Version: 1.2
+Version: 1.3 (VEGAS 2027 Build 31 fork)
 
-Updated: 2026-10-16
+Updated: 2026-10-22
 
 This is the active public beta action and safety contract
-(2.1.0-beta.1; 100 domain actions). The executable catalog is
+(2.1.1-vegas2027.31; all original 100 domain actions). The executable catalog is
 `src\action-catalog.mjs`; automated parity checks require every catalog action
 to have a C# route.
 
 ## Safety contract
+
+- Only `vegas2027.exe` and scripting API file version `2027.0.0.31` are eligible.
+  Build, installation, native startup/dispatch, discovery and explicit PID selection
+  reject incompatible or unverified versions.
 
 - The connector never modifies, replaces, transcodes, or deletes source media.
 - Content actions require the exact active saved `.veg` path.

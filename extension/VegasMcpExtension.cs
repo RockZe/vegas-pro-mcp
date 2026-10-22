@@ -27,11 +27,14 @@ namespace UnitedTaps.VegasMcp
         private string _pipeName;
         private CustomCommand _statusCommand;
         private RenderManager _renderManager;
+        private bool _enabled;
 
         public void InitializeModule(Vegas vegas)
         {
             _vegas = vegas;
             _installRoot = Path.GetDirectoryName(typeof(VegasMcpExtension).Assembly.Location);
+            try { HostCompatibility.AssertCompatible(); }
+            catch (Exception ex) { Log("Connector disabled: " + ex.Message); return; }
             _token = ReadToken();
             _pipeName = "UnitedTaps.VegasMcp." + Process.GetCurrentProcess().Id;
             _renderManager = new RenderManager(_vegas);
@@ -44,11 +47,13 @@ namespace UnitedTaps.VegasMcp
             _listenerThread.IsBackground = true;
             _listenerThread.Name = "UnitedTaps VEGAS MCP pipe listener";
             _listenerThread.Start();
+            _enabled = true;
             Log("Extension initialized on " + _pipeName + ".");
         }
 
         public ICollection GetCustomCommands()
         {
+            if (!_enabled) return new CustomCommand[0];
             _statusCommand = new CustomCommand(CommandCategory.Tools, "UnitedTapsVegasMcpStatusV1");
             _statusCommand.DisplayName = "United Taps VEGAS MCP Status";
             _statusCommand.Invoked += HandleStatusInvoked;
@@ -88,6 +93,7 @@ namespace UnitedTaps.VegasMcp
             record["vegas_version"] = _vegas.Version;
             record["vegas_build"] = _vegas.BuildNumber;
             record["started_utc"] = DateTime.UtcNow.ToString("o");
+            foreach (var item in HostCompatibility.Describe()) record[item.Key] = item.Value;
             string json = CreateSerializer().Serialize(record);
             File.WriteAllText(
                 Path.Combine(instances, Process.GetCurrentProcess().Id + ".json"),
@@ -130,7 +136,7 @@ namespace UnitedTaps.VegasMcp
                 PipeDirection.InOut,
                 1,
                 PipeTransmissionMode.Byte,
-                PipeOptions.None,
+                PipeOptions.Asynchronous,
                 65536,
                 65536,
                 security);
@@ -143,7 +149,7 @@ namespace UnitedTaps.VegasMcp
             using (StreamWriter writer = new StreamWriter(pipe, new UTF8Encoding(false), 65536, true))
             {
                 writer.AutoFlush = true;
-                string line = reader.ReadLine();
+                string line = ReadRequestLine(reader);
                 if (line == null)
                     return;
                 if (line.Length > 4 * 1024 * 1024)
@@ -183,6 +189,7 @@ namespace UnitedTaps.VegasMcp
                     {
                         try
                         {
+                            HostCompatibility.AssertCompatible();
                             if (DateTime.UtcNow >= expires)
                                 throw new TimeoutException("The connector request expired before VEGAS could execute it. Inspect the project before retrying.");
                             data = action.StartsWith("render.", StringComparison.Ordinal)
@@ -219,6 +226,7 @@ namespace UnitedTaps.VegasMcp
                 }
 
                 writer.WriteLine(CreateSerializer().Serialize(response));
+                Log("Request " + requestId + " action=" + action + " ok=" + (commandError == null));
             }
         }
 
@@ -228,6 +236,30 @@ namespace UnitedTaps.VegasMcp
             serializer.MaxJsonLength = 8 * 1024 * 1024;
             serializer.RecursionLimit = 100;
             return serializer;
+        }
+
+        private static string ReadRequestLine(StreamReader reader)
+        {
+            // Bound reads before allocating the entire line; an idle local client
+            // must not monopolize the only listener indefinitely.
+            var line = new StringBuilder();
+            var buffer = new char[4096];
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+            while (true)
+            {
+                Task<int> read = reader.ReadAsync(buffer, 0, buffer.Length);
+                TimeSpan remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero || !read.Wait(remaining))
+                    throw new TimeoutException("Timed out reading connector request.");
+                int count = read.Result;
+                if (count == 0) return line.Length == 0 ? null : line.ToString();
+                int end = Array.IndexOf(buffer, '\n', 0, count);
+                int length = end < 0 ? count : end;
+                if (line.Length + length > 4 * 1024 * 1024)
+                    throw new InvalidOperationException("Request exceeded the 4 MB connector limit.");
+                line.Append(buffer, 0, length);
+                if (end >= 0) return line.ToString();
+            }
         }
 
         private static Dictionary<string, object> Error(string type, string message)
@@ -280,8 +312,11 @@ namespace UnitedTaps.VegasMcp
             {
                 string runtime = Path.Combine(_installRoot, "UnitedTaps.VegasMcp.runtime");
                 Directory.CreateDirectory(runtime);
+                string logPath = Path.Combine(runtime, "vegas-extension.log");
+                if (File.Exists(logPath) && new FileInfo(logPath).Length > 2 * 1024 * 1024)
+                    File.WriteAllText(logPath, "Log truncated at 2 MiB." + Environment.NewLine, new UTF8Encoding(false));
                 File.AppendAllText(
-                    Path.Combine(runtime, "vegas-extension.log"),
+                    logPath,
                     DateTime.UtcNow.ToString("o") + " " + message + Environment.NewLine,
                     new UTF8Encoding(false));
             }

@@ -233,6 +233,7 @@ namespace UnitedTaps.VegasMcp
             Dictionary<string, object> result = ProjectSummary(vegas);
             result["connector"] = VegasMcpExtension.ProductName;
             result["connected"] = true;
+            foreach (var item in HostCompatibility.Describe()) result[item.Key] = item.Value;
             result["process_id"] = System.Diagnostics.Process.GetCurrentProcess().Id;
             result["is_playing"] = vegas.Transport.IsPlaying;
             result["is_recording"] = vegas.Transport.IsRecording;
@@ -1297,7 +1298,7 @@ namespace UnitedTaps.VegasMcp
             string projectName = SafeFileName(Path.GetFileNameWithoutExtension(project.FilePath));
             string directory = Path.Combine(BackupRoot(), projectName);
             Directory.CreateDirectory(directory);
-            string path = Path.Combine(directory, projectName + "__vegas-mcp__" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "__" + SafeFileName(reason) + ".veg");
+            string path = Path.Combine(directory, projectName + "__vegas-mcp__" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "__" + SafeFileName(reason) + "__" + Guid.NewGuid().ToString("N") + ".veg");
             Project clone = project.CloneProject(path);
             try
             {

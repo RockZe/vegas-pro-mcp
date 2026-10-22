@@ -35,8 +35,17 @@ test("render refuses overwrite before beginning the render", () => {
 
 test("installer refuses every vegas-named process before copying the DLL", () => {
   const install = fs.readFileSync(path.join(projectRoot, "scripts", "install-extension.ps1"), "utf8");
-  assert.match(install, /\^vegas\.\*\\\.exe\$/i);
-  assert.ok(install.indexOf("Close every VEGAS process") < install.indexOf("Copy-Item -LiteralPath $distDll"));
+  const helper = fs.readFileSync(path.join(projectRoot, "scripts", "vegas-installation.ps1"), "utf8");
+  assert.match(helper, /\^vegas\.\*\$/i);
+  assert.ok(install.indexOf("Assert-VegasClosed") < install.indexOf("Copy-Item -LiteralPath $distDll"));
+  assert.match(helper, /Get-Process -ErrorAction Stop/);
+});
+
+test("native extension checks exact host before initialization and every dispatch", () => {
+  const native = fs.readFileSync(path.join(projectRoot, "extension", "VegasMcpExtension.cs"), "utf8");
+  assert.ok(native.indexOf("HostCompatibility.AssertCompatible()") < native.indexOf("_token = ReadToken()"));
+  assert.ok(native.lastIndexOf("HostCompatibility.AssertCompatible()") < native.indexOf("_renderManager.Execute(action"));
+  assert.match(native, /if \(!_enabled\) return new CustomCommand\[0\]/);
 });
 
 test("single-event structural edits refuse grouped events unless explicitly acknowledged", () => {

@@ -255,7 +255,14 @@ namespace UnitedTaps.VegasMcp
             GuardProject(vegas.Project, p);
             VideoTrack track = GetTrack(vegas.Project, RequireInt(p, "track_index")) as VideoTrack;
             if (track == null) throw new InvalidOperationException("The target track is not video.");
-            return Result("motion", TrackMotionData(track));
+            // The 2027 API calls native TrackMotionInitialize even from the getter.
+            // It requires an Undo context in application extensions. Cancel the
+            // temporary context so inspection adds no Undo entry or project edit.
+            using (UndoBlock undo = new UndoBlock("VEGAS MCP: inspect track motion"))
+            {
+                try { return Result("motion", TrackMotionData(track)); }
+                finally { undo.Cancel = true; }
+            }
         }
 
         private static object SetTrackMotionKeyframe(Vegas vegas, Dictionary<string, object> p)
@@ -512,11 +519,12 @@ namespace UnitedTaps.VegasMcp
             Dictionary<string, object> data = new Dictionary<string, object>();
             data["track_index"] = track.Index;
             data["track_name"] = track.Name;
-            data["has_motion_data"] = track.TrackMotion.HasMotionData;
-            TrackMotionScaleFactors scales = track.TrackMotion.ScaleFactors;
+            TrackMotion motion = track.TrackMotion;
+            data["has_motion_data"] = motion.HasMotionData;
+            TrackMotionScaleFactors scales = motion.ScaleFactors;
             data["scale_factors"] = new Dictionary<string, object> { { "x", scales.X }, { "y", scales.Y }, { "z", scales.Z }, { "width", scales.W }, { "height", scales.H }, { "depth", scales.D }, { "angle", scales.A }, { "percent", scales.P } };
             List<object> keyframes = new List<object>();
-            foreach (TrackMotionKeyframe keyframe in track.TrackMotion.MotionKeyframes)
+            foreach (TrackMotionKeyframe keyframe in motion.MotionKeyframes)
             {
                 keyframes.Add(new Dictionary<string, object> {
                     { "index", keyframe.Index }, { "position_seconds", Seconds(keyframe.Position) }, { "position_frames", keyframe.Position.FrameCount },
